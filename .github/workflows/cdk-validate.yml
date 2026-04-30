@@ -1,0 +1,28 @@
+name: cdk-validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: synth + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install --no-audit --prefer-offline
+      - name: type check
+        run: npx tsc --noEmit
+      - name: lint
+        run: npm run lint
+      - name: cdk synth
+        env:
+          CDK_DEFAULT_ACCOUNT: '111111111111'
+          CDK_DEFAULT_REGION: us-east-1
+        run: npm run synth -- --quiet
