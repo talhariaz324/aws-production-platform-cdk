@@ -1,8 +1,8 @@
 {
-  "name": "aws-fintech-platform-cdk",
+  "name": "aws-production-platform-cdk",
   "version": "0.1.0",
   "private": true,
-  "description": "Production AWS infrastructure blueprint for a fintech platform — CDK in TypeScript",
+  "description": "Production AWS infrastructure blueprint for a multi-service backend platform — CDK in TypeScript",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",

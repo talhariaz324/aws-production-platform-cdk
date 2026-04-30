@@ -39,7 +39,7 @@ export class AppStack extends cdk.Stack {
     const { projectName } = props;
 
     // ─── ECR repos for service images ─────────────────────────────────────────
-    // Sample fintech service set — adjust to your actual services.
+    // Sample backend service set — adjust to your actual services.
     const services = [
       'api-gateway',
       'auth',

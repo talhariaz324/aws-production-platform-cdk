@@ -8,11 +8,11 @@ const env = {
   region: process.env.CDK_DEFAULT_REGION ?? 'us-east-1',
 };
 
-const projectName = 'acme-fintech';
+const projectName = 'acme-platform';
 
 const app = new cdk.App();
 
-const foundation = new FoundationStack(app, 'AcmeFintechFoundationStack', {
+const foundation = new FoundationStack(app, 'AcmePlatformFoundationStack', {
   env,
   projectName,
   description: 'VPC, subnets, NAT, VPC endpoints, security groups, KMS, IAM roles',

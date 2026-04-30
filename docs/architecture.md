@@ -96,7 +96,7 @@ Why 5 stacks (not 1, not 12):
 
 ## Bounded contexts and service set
 
-The blueprint uses a sample fintech service set:
+The blueprint uses a sample backend service set (loosely fintech-shaped — adjust to your domain):
 
 | Service | Workload class | Owns |
 |---|---|---|

@@ -1,6 +1,6 @@
 # Cost Optimization Playbook
 
-What a production fintech AWS bill looks like at small-team scale, and where the levers are. Numbers are illustrative for a comparable workload — your bill will track yours, not these.
+What a production AWS bill for a multi-service backend looks like at small-team scale, and where the levers are. Numbers are illustrative for a comparable workload — your bill will track yours, not these.
 
 ## Illustrative monthly snapshot (small-team production)
 

@@ -1,6 +1,11 @@
-# aws-fintech-platform-cdk
+# aws-production-platform-cdk
 
-Production-grade AWS infrastructure blueprint for a fintech platform — written in **AWS CDK (TypeScript)**. Demonstrates the patterns and trade-offs you reach for when running real money flow on AWS at small-team scale: VPC + ECS + RDS + MSK + CloudFront + KMS + OIDC CI/CD, with **cost optimization, scaling levers, and forensic incident walkthroughs documented inline**.
+[![cdk-validate](https://github.com/talhariaz324/aws-production-platform-cdk/actions/workflows/cdk-validate.yml/badge.svg)](https://github.com/talhariaz324/aws-production-platform-cdk/actions/workflows/cdk-validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](.nvmrc)
+[![CDK](https://img.shields.io/badge/AWS%20CDK-2.140-orange)](package.json)
+
+Production-grade AWS infrastructure blueprint for a multi-service backend platform — written in **AWS CDK (TypeScript)**. Demonstrates the patterns and trade-offs senior engineers reach for when running real workloads on AWS at small-team scale: VPC + ECS + RDS + MSK + CloudFront + KMS + OIDC CI/CD, with **cost optimization, scaling levers, and forensic incident walkthroughs documented inline**.
 
 This is a teaching architecture. Every choice has a documented "why," its trade-off, and a concrete trigger for when to reconsider it.
 
@@ -98,7 +103,7 @@ Common thread: **most AWS incidents live at the boundary between services, not i
 ## Repo layout
 
 ```
-aws-fintech-platform-cdk/
+aws-production-platform-cdk/
 ├── cdk/
 │   ├── bin/
 │   │   └── app.ts                  # CDK app entrypoint
