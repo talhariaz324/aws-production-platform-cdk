@@ -1,0 +1,31 @@
+{
+  "name": "aws-fintech-platform-cdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Production AWS infrastructure blueprint for a fintech platform — CDK in TypeScript",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy --all --require-approval broadening",
+    "lint": "eslint cdk --ext .ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "aws-cdk": "^2.140.0",
+    "eslint": "^8.57.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.140.0",
+    "constructs": "^10.3.0",
+    "source-map-support": "^0.5.21"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
