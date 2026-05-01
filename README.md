@@ -80,7 +80,7 @@ These are the questions an interviewer or CTO will ask. Short answers here; defe
 | **ECS on EC2** | Steady-state workload, capacity providers map to workload classes | Fargate is ~30% more expensive at sustained load; EKS premium isn't justified at small scale |
 | **Single-AZ RDS** at launch | Multi-AZ doubles RDS cost (~$150/mo) | Pre-revenue, AZ-failure rate (~0.1%/yr) doesn't justify the recurring cost |
 | **MSK Kafka** | Durable replayable log + per-key ordering + multi-consumer | SNS+SQS lacks replay; SQS FIFO has throughput limits |
-| **ALB + RDS** | ALB + RDS standby ready, NAT-per-AZ pattern | 3rd AZ adds NAT (~$33/mo) for marginal gain pre-scale |
+| **ALB and RDS** | ALB + RDS standby ready, NAT-per-AZ pattern | 3rd AZ adds NAT (~$33/mo) for marginal gain pre-scale |
 | **Single AWS account** | Strict IAM + resource policies cover the threat model | Multi-account adds CDK pipeline complexity; right answer at SOC 2 trigger |
 | **CloudWatch over Datadog** | $15-25/mo vs. $200+/mo at small scale | Datadog UX is better; revisit at 10× or when distributed tracing is critical to MTTR |
 | **OIDC for CI auth** | No long-lived AWS keys in GitHub | GitHub repository secrets are a credential rotation hazard |
