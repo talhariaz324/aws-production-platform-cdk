@@ -9,6 +9,7 @@ import { Construct } from 'constructs';
 
 export interface AppStackProps extends cdk.StackProps {
   projectName: string;
+  stage: string;
   vpc: ec2.IVpc;
   albSg: ec2.ISecurityGroup;
   ecsSg: ec2.ISecurityGroup;
@@ -36,7 +37,7 @@ export class AppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AppStackProps) {
     super(scope, id, props);
 
-    const { projectName } = props;
+    const { projectName, stage } = props;
 
     // ─── ECR repos for service images ─────────────────────────────────────────
     // Sample backend service set — adjust to your actual services.
@@ -52,7 +53,7 @@ export class AppStack extends cdk.Stack {
     ];
     for (const svc of services) {
       new ecr.Repository(this, `${svc}Repo`, {
-        repositoryName: `${projectName}-prod/${svc}`,
+        repositoryName: `${projectName}-${stage}/${svc}`,
         imageScanOnPush: true,
         lifecycleRules: [
           { description: 'keep last 10 images', maxImageCount: 10 },
@@ -68,7 +69,7 @@ export class AppStack extends cdk.Stack {
 
     // ─── ECS Cluster ──────────────────────────────────────────────────────────
     this.cluster = new ecs.Cluster(this, 'Cluster', {
-      clusterName: `${projectName}-prod`,
+      clusterName: `${projectName}-${stage}`,
       vpc: props.vpc,
       containerInsights: true,
     });

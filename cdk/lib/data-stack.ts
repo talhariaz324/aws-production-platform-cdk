@@ -9,6 +9,7 @@ import { Construct } from 'constructs';
 
 export interface DataStackProps extends cdk.StackProps {
   projectName: string;
+  stage: string;
   vpc: ec2.IVpc;
   kmsKey: kms.IKey;
   rdsSg: ec2.ISecurityGroup;
@@ -33,7 +34,7 @@ export class DataStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: DataStackProps) {
     super(scope, id, props);
 
-    const { projectName } = props;
+    const { projectName, stage } = props;
 
     // ─── RDS PostgreSQL ───────────────────────────────────────────────────────
     // db.t3.large balances cost and headroom for ~10 services on a
@@ -41,7 +42,7 @@ export class DataStack extends cdk.Stack {
     // instance — share infra, isolate logically. Single-AZ deferred until
     // revenue covers the +$ cost (see docs/cost-optimization.md).
     const dbCredentials = new secretsmanager.Secret(this, 'DbCredentials', {
-      secretName: `${projectName}/prod/rds-master`,
+      secretName: `${projectName}/${stage}/rds-master`,
       description: 'RDS master credentials',
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: 'platform_admin' }),
@@ -86,7 +87,7 @@ export class DataStack extends cdk.Stack {
     });
 
     this.appRedis = new elasticache.CfnReplicationGroup(this, 'AppRedis', {
-      replicationGroupId: `${projectName}-prod-app`,
+      replicationGroupId: `${projectName}-${stage}-app`,
       replicationGroupDescription: 'app cache — single node, ephemeral',
       engine: 'redis',
       cacheNodeType: 'cache.t3.small',
@@ -100,7 +101,7 @@ export class DataStack extends cdk.Stack {
     });
 
     this.sessionRedis = new elasticache.CfnReplicationGroup(this, 'SessionRedis', {
-      replicationGroupId: `${projectName}-prod-session`,
+      replicationGroupId: `${projectName}-${stage}-session`,
       replicationGroupDescription: 'session store — multi-AZ, durable',
       engine: 'redis',
       cacheNodeType: 'cache.t3.micro',
@@ -121,7 +122,7 @@ export class DataStack extends cdk.Stack {
     // Self-managed Kafka on EC2 is cheaper but operationally toxic (broker
     // upgrades, ZooKeeper coordination, monitoring) — MSK earns its premium.
     this.mskCluster = new msk.CfnCluster(this, 'Kafka', {
-      clusterName: `${projectName}-prod-kafka`,
+      clusterName: `${projectName}-${stage}-kafka`,
       kafkaVersion: '3.7.x',
       numberOfBrokerNodes: 3,
       brokerNodeGroupInfo: {

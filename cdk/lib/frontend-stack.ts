@@ -6,6 +6,7 @@ import { Construct } from 'constructs';
 
 export interface FrontendStackProps extends cdk.StackProps {
   projectName: string;
+  stage: string;
 }
 
 /**
@@ -27,7 +28,7 @@ export class FrontendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: FrontendStackProps) {
     super(scope, id, props);
 
-    const { projectName } = props;
+    const { projectName, stage } = props;
 
     const buildSpaDistribution = (
       bucket: s3.Bucket,
@@ -76,19 +77,19 @@ export class FrontendStack extends cdk.Stack {
 
     this.userDashboardBucket = new s3.Bucket(this, 'UserDashboardBucket', {
       ...bucketProps,
-      bucketName: `${projectName}-prod-user-dashboard`,
+      bucketName: `${projectName}-${stage}-user-dashboard`,
     });
     this.adminBucket = new s3.Bucket(this, 'AdminBucket', {
       ...bucketProps,
-      bucketName: `${projectName}-prod-admin`,
+      bucketName: `${projectName}-${stage}-admin`,
     });
     this.landingBucket = new s3.Bucket(this, 'LandingBucket', {
       ...bucketProps,
-      bucketName: `${projectName}-prod-landing`,
+      bucketName: `${projectName}-${stage}-landing`,
     });
     this.publicAssetsBucket = new s3.Bucket(this, 'PublicAssetsBucket', {
       ...bucketProps,
-      bucketName: `${projectName}-prod-public-assets`,
+      bucketName: `${projectName}-${stage}-public-assets`,
       cors: [
         {
           allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
