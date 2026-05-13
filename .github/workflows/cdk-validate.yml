@@ -8,7 +8,7 @@ on:
 
 jobs:
   validate:
-    name: synth + lint
+    name: synth + lint + test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +21,8 @@ jobs:
         run: npx tsc --noEmit
       - name: lint
         run: npm run lint
+      - name: unit tests
+        run: npm test -- --ci
       - name: cdk synth
         env:
           CDK_DEFAULT_ACCOUNT: '111111111111'
