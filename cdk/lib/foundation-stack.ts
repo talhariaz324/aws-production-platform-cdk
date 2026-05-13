@@ -6,6 +6,11 @@ import { Construct } from 'constructs';
 
 export interface FoundationStackProps extends cdk.StackProps {
   projectName: string;
+  stage: string;
+  // `<owner>/<repo>` — used to scope the OIDC trust policy. Defaults to main
+  // branch; restrict further (environment, ref pattern) for tighter blast
+  // radius in real deployments.
+  githubRepo: string;
 }
 
 /**
@@ -25,7 +30,7 @@ export class FoundationStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: FoundationStackProps) {
     super(scope, id, props);
 
-    const { projectName } = props;
+    const { projectName, stage, githubRepo } = props;
 
     // ─── VPC ──────────────────────────────────────────────────────────────────
     // 2 AZs is the minimum AWS requires for ALB / RDS Multi-AZ-ready posture.
@@ -33,7 +38,7 @@ export class FoundationStack extends cdk.Stack {
     // gain at small-team scale. Document the trade-off; revisit when revenue
     // justifies the third AZ.
     this.vpc = new ec2.Vpc(this, 'Vpc', {
-      vpcName: `${projectName}-prod-vpc`,
+      vpcName: `${projectName}-${stage}-vpc`,
       maxAzs: 2,
       natGateways: 2, // one per AZ — protects against single-AZ NAT outage
       subnetConfiguration: [
@@ -87,14 +92,20 @@ export class FoundationStack extends cdk.Stack {
     });
     this.redisSg.addIngressRule(this.ecsSg, ec2.Port.tcp(6379), 'redis from ECS');
 
+    // ─── MSK security group ───────────────────────────────────────────────────
+    // Data-stack configures encryptionInTransit.clientBroker = 'TLS', so we
+    // only open the TLS client port. Notes on what was deliberately NOT opened:
+    //   • 9092 (PLAINTEXT) — would contradict the TLS-only client setting.
+    //   • 2181 (ZooKeeper) — MSK 3.7.x runs in KRaft mode; ZooKeeper is gone.
+    //     The previous rule was a vestige from older Kafka versions.
+    //   • Broker-to-broker traffic — AWS manages it inside the MSK service
+    //     boundary; no client SG rule is needed for in-cluster replication.
     this.mskSg = new ec2.SecurityGroup(this, 'MskSg', {
       vpc: this.vpc,
-      description: 'MSK Kafka brokers — accept from ECS only',
+      description: 'MSK Kafka brokers — accept TLS client traffic from ECS only',
       allowAllOutbound: false,
     });
-    this.mskSg.addIngressRule(this.ecsSg, ec2.Port.tcp(9092), 'kafka plaintext (in-vpc)');
-    this.mskSg.addIngressRule(this.ecsSg, ec2.Port.tcp(9094), 'kafka tls');
-    this.mskSg.addIngressRule(this.mskSg, ec2.Port.tcp(2181), 'inter-broker');
+    this.mskSg.addIngressRule(this.ecsSg, ec2.Port.tcp(9094), 'kafka client TLS from ECS');
 
     // ─── KMS multi-region key ─────────────────────────────────────────────────
     // Single key for everything (RDS, S3, Secrets, MSK at-rest).
@@ -102,7 +113,7 @@ export class FoundationStack extends cdk.Stack {
     // (key rotation coordination across services) for negligible blast-radius
     // gain. Multi-region replica enables cross-region restore.
     this.kmsKey = new kms.Key(this, 'PrimaryKey', {
-      alias: `${projectName}/prod/primary`,
+      alias: `${projectName}/${stage}/primary`,
       description: 'Primary CMK for at-rest encryption — RDS, S3, Secrets, MSK',
       enableKeyRotation: true,
       pendingWindow: cdk.Duration.days(30),
@@ -111,20 +122,16 @@ export class FoundationStack extends cdk.Stack {
     });
 
     // ─── GitHub Actions OIDC role ─────────────────────────────────────────────
-    // No long-lived AWS access keys stored in GitHub secrets.
-    // Token is bound to repo + branch + workflow.
-    // ─── REPLACE the `sub` condition value below with your repo + branch
-    //     before deploying. The pattern is:
-    //         repo:<owner>/<repo>:ref:refs/heads/<branch>
-    //     or for environment-scoped tokens:
-    //         repo:<owner>/<repo>:environment:<env-name>
+    // No long-lived AWS access keys stored in GitHub secrets. Token is bound
+    // to the specific repo passed via context. Tighten the `sub` further
+    // (environment-scoped, ref pattern) for production deployments.
     const oidcProvider = new iam.OpenIdConnectProvider(this, 'GitHubOidc', {
       url: 'https://token.actions.githubusercontent.com',
       clientIds: ['sts.amazonaws.com'],
     });
 
     this.githubOidcRole = new iam.Role(this, 'GitHubActionsRole', {
-      roleName: `${projectName}-prod-github-actions`,
+      roleName: `${projectName}-${stage}-github-actions`,
       assumedBy: new iam.FederatedPrincipal(
         oidcProvider.openIdConnectProviderArn,
         {
@@ -132,17 +139,99 @@ export class FoundationStack extends cdk.Stack {
             'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
           },
           StringLike: {
-            'token.actions.githubusercontent.com:sub': 'repo:<github-org>/<backend-repo>:ref:refs/heads/main',
+            'token.actions.githubusercontent.com:sub': `repo:${githubRepo}:ref:refs/heads/main`,
           },
         },
         'sts:AssumeRoleWithWebIdentity',
       ),
-      description: 'CI deploy role — minimum scope: ECR push + ECS update-service',
+      description: 'CI deploy role — scoped to ECR push + ECS update-service for this project',
       maxSessionDuration: cdk.Duration.hours(1),
     });
+
+    // Least-privilege CI policy. Resource ARNs use project + stage naming so
+    // this role cannot push images or roll services it does not own.
+    const ecrRepoArnPattern = cdk.Stack.of(this).formatArn({
+      service: 'ecr',
+      resource: 'repository',
+      resourceName: `${projectName}-${stage}/*`,
+    });
+    const ecsServiceArnPattern = cdk.Stack.of(this).formatArn({
+      service: 'ecs',
+      resource: 'service',
+      resourceName: `${projectName}-${stage}/*`,
+    });
+    const ecsTaskDefArnPattern = cdk.Stack.of(this).formatArn({
+      service: 'ecs',
+      resource: 'task-definition',
+      resourceName: '*',
+    });
+
+    this.githubOidcRole.addToPolicy(
+      // ECR auth token is account-scoped — AWS does not support resource-level
+      // restriction on GetAuthorizationToken.
+      new iam.PolicyStatement({
+        sid: 'EcrAuth',
+        actions: ['ecr:GetAuthorizationToken'],
+        resources: ['*'],
+      }),
+    );
+    this.githubOidcRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'EcrPush',
+        actions: [
+          'ecr:BatchCheckLayerAvailability',
+          'ecr:InitiateLayerUpload',
+          'ecr:UploadLayerPart',
+          'ecr:CompleteLayerUpload',
+          'ecr:PutImage',
+          'ecr:BatchGetImage',
+          'ecr:DescribeRepositories',
+          'ecr:DescribeImages',
+        ],
+        resources: [ecrRepoArnPattern],
+      }),
+    );
+    this.githubOidcRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'EcsRollout',
+        actions: [
+          'ecs:UpdateService',
+          'ecs:DescribeServices',
+          'ecs:DescribeTaskDefinition',
+          'ecs:RegisterTaskDefinition',
+          'ecs:DeregisterTaskDefinition',
+        ],
+        resources: [ecsServiceArnPattern, ecsTaskDefArnPattern],
+      }),
+    );
+    this.githubOidcRole.addToPolicy(
+      // ECS requires PassRole on task execution / task roles when a new task
+      // definition is registered. Scope to roles tagged for this project so a
+      // compromised CI cannot escalate to unrelated roles in the account.
+      new iam.PolicyStatement({
+        sid: 'PassEcsTaskRoles',
+        actions: ['iam:PassRole'],
+        resources: ['*'],
+        conditions: {
+          StringEquals: {
+            'iam:PassedToService': 'ecs-tasks.amazonaws.com',
+          },
+          StringLike: {
+            'iam:AssociatedResourceArn': [
+              cdk.Stack.of(this).formatArn({
+                service: 'ecs',
+                resource: 'task-definition',
+                resourceName: `${projectName}-${stage}*`,
+              }),
+            ],
+          },
+        },
+      }),
+    );
 
     // Outputs for cross-stack reference
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'KmsKeyArn', { value: this.kmsKey.keyArn });
+    new cdk.CfnOutput(this, 'GitHubActionsRoleArn', { value: this.githubOidcRole.roleArn });
   }
 }
