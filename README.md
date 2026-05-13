@@ -157,18 +157,26 @@ npx tsc --noEmit
 # Bootstrap CDK in your account/region (one-time)
 npx cdk bootstrap aws://<ACCOUNT>/<REGION>
 
-# Deploy all stacks
-npm run deploy
+# Deploy all stacks (defaults to stage=prod). The OIDC trust policy + alert
+# topic are configured via CDK context so no source edits are needed.
+npm run deploy -- \
+  -c githubRepo=<owner>/<repo> \
+  -c alertEmail=oncall@example.com
+
+# Synth a non-prod stack set in parallel (renames all resources, no deploy):
+npx cdk synth -c stage=dev
 
 # Destroy when done (RDS + S3 buckets are RETAIN — manual cleanup)
 npx cdk destroy --all
 ```
 
-**Before deploying**, edit `cdk/lib/foundation-stack.ts` and replace the OIDC role's `sub` claim placeholder with your repo and branch:
+Context knobs the app reads:
 
-```ts
-'token.actions.githubusercontent.com:sub': 'repo:<github-org>/<backend-repo>:ref:refs/heads/main',
-```
+| Context | Default | Purpose |
+|---|---|---|
+| `stage` | `prod` | Resource-name suffix. Only `prod` is wired in `bin/app.ts` today; other values let you synth a parallel name space for review. |
+| `githubRepo` | repo this code lives in | `<owner>/<repo>` — scopes the OIDC `sub` claim so the role cannot be assumed from another repo. |
+| `alertEmail` | placeholder | SNS topic subscription target for CloudWatch alarms. |
 
 ---
 
