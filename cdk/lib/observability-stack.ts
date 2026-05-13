@@ -9,6 +9,7 @@ import { Construct } from 'constructs';
 
 export interface ObservabilityStackProps extends cdk.StackProps {
   projectName: string;
+  stage: string;
   alertEmail: string;
   rdsInstanceIdentifier: string;
 }
@@ -26,11 +27,11 @@ export class ObservabilityStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ObservabilityStackProps) {
     super(scope, id, props);
 
-    const { projectName } = props;
+    const { projectName, stage } = props;
 
     // ─── SNS topic for alerts ─────────────────────────────────────────────────
     this.alertTopic = new sns.Topic(this, 'AlertTopic', {
-      topicName: `${projectName}-prod-alerts`,
+      topicName: `${projectName}-${stage}-alerts`,
       displayName: `${projectName} prod alerts`,
     });
     this.alertTopic.addSubscription(new snsSub.EmailSubscription(props.alertEmail));
@@ -88,7 +89,7 @@ export class ObservabilityStack extends cdk.Stack {
 
     // ─── WAF (regional, attaches to ALB) ──────────────────────────────────────
     new wafv2.CfnWebACL(this, 'WebAcl', {
-      name: `${projectName}-prod-web-acl`,
+      name: `${projectName}-${stage}-web-acl`,
       scope: 'REGIONAL',
       defaultAction: { allow: {} },
       rules: [
@@ -138,16 +139,29 @@ export class ObservabilityStack extends cdk.Stack {
       visibilityConfig: {
         sampledRequestsEnabled: true,
         cloudWatchMetricsEnabled: true,
-        metricName: `${projectName}-prod-acl`,
+        metricName: `${projectName}-${stage}-acl`,
       },
     });
 
     // ─── Log groups with retention ────────────────────────────────────────────
     // Default CloudWatch log retention is "never expire" — that's how a $5/mo
     // logs bill becomes $200/mo over a year. Explicit retention is required.
-    new logs.LogGroup(this, 'EcsCoreLogs', {
-      logGroupName: `/ecs/${projectName}-prod/core`,
-      retention: logs.RetentionDays.ONE_MONTH,
+    // One log group per capacity-provider class to match the app-stack layout
+    // and one for ALB access logs, so request-side logs don't leak into an
+    // unmanaged default group with infinite retention.
+    const workloadClasses = ['core', 'supporting', 'singleton'] as const;
+    for (const workload of workloadClasses) {
+      const idSuffix = workload.charAt(0).toUpperCase() + workload.slice(1);
+      new logs.LogGroup(this, `EcsLogs${idSuffix}`, {
+        logGroupName: `/ecs/${projectName}-${stage}/${workload}`,
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+      });
+    }
+
+    new logs.LogGroup(this, 'AlbAccessLogs', {
+      logGroupName: `/alb/${projectName}-${stage}/access`,
+      retention: logs.RetentionDays.TWO_WEEKS,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
