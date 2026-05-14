@@ -68,10 +68,15 @@ export class AppStack extends cdk.Stack {
     }
 
     // ─── ECS Cluster ──────────────────────────────────────────────────────────
+    // containerInsightsV2 supersedes the boolean `containerInsights` flag.
+    // ENABLED gives standard Container Insights metrics; ENHANCED adds
+    // per-task / per-container granularity at a higher CloudWatch cost.
+    // ENABLED is the right baseline — flip to ENHANCED only when you need
+    // task-level CPU / memory attribution to chase a specific issue.
     this.cluster = new ecs.Cluster(this, 'Cluster', {
       clusterName: `${projectName}-${stage}`,
       vpc: props.vpc,
-      containerInsights: true,
+      containerInsightsV2: ecs.ContainerInsights.ENABLED,
     });
 
     // ─── Capacity Providers ───────────────────────────────────────────────────

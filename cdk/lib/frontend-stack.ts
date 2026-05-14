@@ -35,13 +35,19 @@ export class FrontendStack extends cdk.Stack {
       label: string,
       cachePolicy: cloudfront.ICachePolicy,
     ): cloudfront.Distribution => {
-      const oai = new cloudfront.OriginAccessIdentity(this, `${label}Oai`);
-      bucket.grantRead(oai);
-
+      // S3BucketOrigin.withOriginAccessControl() uses Origin Access Control
+      // (OAC), the modern AWS-recommended pattern. OAC supersedes the legacy
+      // Origin Access Identity (OAI) on three concrete axes:
+      //   1. SigV4 request signing — works with all S3 regions, including
+      //      the ones launched after 2022 where OAI silently fails.
+      //   2. Native support for SSE-KMS encrypted objects (OAI requires a
+      //      separate KMS key policy dance).
+      //   3. CDK provisions the bucket policy + OAC automatically — no
+      //      bucket.grantRead(oai) wiring required.
       return new cloudfront.Distribution(this, `${label}Distro`, {
         defaultRootObject: 'index.html',
         defaultBehavior: {
-          origin: new origins.S3Origin(bucket, { originAccessIdentity: oai }),
+          origin: origins.S3BucketOrigin.withOriginAccessControl(bucket),
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy,
           compress: true,
@@ -124,7 +130,7 @@ export class FrontendStack extends cdk.Stack {
     // doesn't affect authenticated app traffic.
     new cloudfront.Distribution(this, 'PublicAssetsDistro', {
       defaultBehavior: {
-        origin: new origins.S3Origin(this.publicAssetsBucket),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(this.publicAssetsBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: aggressive,
       },
